@@ -1,0 +1,12 @@
+# Backstop global (setiap folder punya .gitignore sendiri; ini jaring pengaman).
+# JANGAN commit file berikut ke GitHub (repo publik!):
+.env
+*.pem
+*.key
+*.bak*
+*~
+data/
+*.db
+.trivyignore
+.DS_Store
+Thumbs.db

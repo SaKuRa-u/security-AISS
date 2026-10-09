@@ -1,0 +1,33 @@
+# Coraza SPOA config. Adaptasi dari example/coraza-spoa.yaml resmi:
+# https://github.com/corazawaf/coraza-spoa
+# App `edge` harus sama dengan txn.coraza.app yang di-set haproxy.cfg.
+# CRS v4 via modul Go bawaan (tidak perlu download ruleset).
+# Mode awal: SecRuleEngine On (enforcing). Kalau login/OAuth kena false-positive,
+# ganti ke DetectionOnly dulu, tuning, baru On lagi.
+bind: 0.0.0.0:9000
+log_level: info
+log_file: /dev/stdout
+log_format: console
+default_application: edge
+applications:
+  - name: edge
+    directives: |
+      # HARUS di atas Includes: rule dieksekusi urut config, jadi setvar ini
+      # harus berjalan SEBELUM rule 911100 mengecek method. ID 100xxx = range
+      # infrastruktur (tuning API Authentik: PUT/PATCH/DELETE), tidak dihitung
+      # sebagai serangan oleh SPOA.
+      SecAction "id:100001,phase:1,pass,nolog,setvar:tx.allowed_methods=GET HEAD POST OPTIONS PUT PATCH DELETE"
+      # Sama untuk content-type: salinan persis default CRS 4.20.0
+      # (crs-setup.conf.example id:900220) + |application/scim+json| untuk SCIM.
+      # Tanpa ini rule 920420 memblokir POST SCIM app toko.
+      SecAction "id:100002,phase:1,pass,nolog,setvar:tx.allowed_request_content_type=|application/x-www-form-urlencoded| |multipart/form-data| |text/xml| |application/xml| |application/soap+xml| |application/json| |application/reports+json| |application/csp-report| |application/scim+json|"
+      Include @coraza.conf-recommended
+      Include @crs-setup.conf.example
+      Include @owasp_crs/*.conf
+      SecRuleEngine On
+    # HAProxy hanya kirim request (tanpa response check)
+    response_check: false
+    transaction_ttl_ms: 60000
+    log_level: info
+    log_file: /dev/stdout
+    log_format: console

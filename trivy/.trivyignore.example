@@ -1,0 +1,7 @@
+# Template pengecualian CVE. Salin ke `.trivyignore` (gitignored) dan isi
+# HANYA dengan alasan tertulis per baris. Format: CVE-YYYY-NNNNN  # alasan.
+# Aturan: tak-reachable / sudah mitigasi di layer lain / false positive
+# terkonfirmasi. Jangan borong; tiap baris = utang yang ditandatangani.
+
+# Contoh (JANGAN aktifkan tanpa verifikasi):
+# CVE-2026-00000  # contoh: hanya reachable via fitur X yang tidak dipakai (bukti: ...)

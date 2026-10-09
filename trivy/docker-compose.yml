@@ -1,0 +1,28 @@
+services:
+  # Trivy one-shot scanner (Aquasec, pin 0.75.0 = latest Okt 2026).
+  # Tidak ada ports, tidak ada restart: dijalankan manual per0205 audit:
+  #   docker compose run --rm trivy image <img>
+  # Lihat README.md (Fase 0-5) untuk runbook lengkap.
+  trivy:
+    image: aquasec/trivy:0.75.0
+    container_name: trivy
+    restart: "no"
+    entrypoint: ["trivy"]
+    command: ["version"]
+    volumes:
+      # Cache DB CVE + scan (persist agar unduhan ratusan MB cukup sekali).
+      - trivy-cache:/root/.cache
+      # Akses image lokal tanpa pull ulang. CATATAN: socket = setara root,
+      # hanya untuk audit lokal, jangan publish service ini.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Repo untuk scan fs (misconfig + secret), read-only.
+      - ../haproxy:/scan/haproxy:ro
+      - ../crowdsec:/scan/crowdsec:ro
+      - ../netbird:/scan/netbird:ro
+      - ../authentik:/scan/authentik:ro
+      - ./trivy.yaml:/etc/trivy/trivy.yaml:ro
+      - ./.trivyignore:/scan/.trivyignore:ro
+    working_dir: /scan
+
+volumes:
+  trivy-cache:

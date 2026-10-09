@@ -1,0 +1,10 @@
+# Default CLI agar perintah pendek. Dioverride eksplisit bila perlu.
+# Dipakai via: docker compose run --rm trivy --config /etc/trivy/trivy.yaml image <img>
+severity:
+  - HIGH
+  - CRITICAL
+scanners:
+  - vuln
+  - secret
+format: table
+quiet: false

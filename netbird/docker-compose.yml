@@ -1,0 +1,42 @@
+services:
+  dashboard:
+    image: ${DASHBOARD_IMAGE:-netbirdio/dashboard:latest}
+    container_name: netbird-dashboard
+    restart: unless-stopped
+    networks: [netbird, edge]
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${DASHBOARD_HOST_PORT:-8080}:80"
+    env_file:
+      - ./dashboard.env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "2"
+
+  netbird-server:
+    image: ${NETBIRD_SERVER_IMAGE:-netbirdio/netbird-server:latest}
+    container_name: netbird-server
+    restart: unless-stopped
+    networks: [netbird, edge]
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${MANAGEMENT_HOST_PORT:-8081}:80"
+      - "${STUN_PORT:-3478}:${STUN_PORT:-3478}/udp"
+    volumes:
+      - netbird_data:/var/lib/netbird
+      - ./config.yaml:/etc/netbird/config.yaml:ro
+    command: ["--config", "/etc/netbird/config.yaml"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "2"
+
+volumes:
+  netbird_data:
+
+networks:
+  netbird:
+    driver: bridge
+  edge:
+    external: true

@@ -1,0 +1,52 @@
+services:
+  haproxy:
+    image: ${HAPROXY_IMAGE:-haproxy:3.4}
+    container_name: haproxy
+    hostname: haproxy-edge
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./coraza-spoe.cfg:/usr/local/etc/haproxy/coraza-spoe.cfg:ro
+      - ./certs:/etc/haproxy/certs:ro
+      # CrowdSec L7 bouncer (Lua classic): stub until upstream v0.0.6 pin (see lua/README.md).
+      - ./lua:/usr/local/etc/haproxy/lua:ro
+      # Bouncer conf (example with placeholder key; render real key on VPS only).
+      - ../crowdsec/conf/crowdsec-haproxy-bouncer.conf:/etc/crowdsec/bouncers/crowdsec-haproxy-bouncer.conf:ro
+      # Stream-mode decision map (rw, persist antar recreate; lihat conf MAP_PATH).
+      - crowdsec-map:/tmp/crowdsec
+    networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "2"
+
+  coraza-spoa:
+    # Build dari tag rilis terverifikasi (ghcr tag suffix -crs4 tidak diverifikasi,
+    # jadi build dari source resmi; butuh `docker compose up --build` pertama kali).
+    build:
+      context: https://github.com/corazawaf/coraza-spoa.git#v0.5.0
+      dockerfile: ./example/Dockerfile
+    image: coraza-spoa:0.5.0
+    container_name: coraza-spoa
+    restart: unless-stopped
+    volumes:
+      - ./coraza-spoa.yaml:/config.yaml:ro
+    networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "2"
+
+# Network bersama untuk semua proyek edge (netbird, dst).
+# Buat sekali: docker network create edge
+networks:
+  edge:
+    external: true
+
+volumes:
+  crowdsec-map:

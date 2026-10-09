@@ -1,0 +1,9 @@
+# HAProxy logs via syslog (UDP), dual-logged from haproxy global `log crowdsec:514`.
+# CrowdSec acts as the syslog server here (UDP only, RFC3164/RFC5424).
+# Ref: https://doc.crowdsec.net/docs/log_processor/data_sources/syslog
+# Parsed with the haproxy collection (COLLECTIONS env in docker-compose.yml).
+source: syslog
+listen_addr: 0.0.0.0
+listen_port: 514
+labels:
+  type: haproxy

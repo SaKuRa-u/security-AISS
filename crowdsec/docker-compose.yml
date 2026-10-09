@@ -1,0 +1,41 @@
+services:
+  crowdsec:
+    # Pinned to latest stable v1.8.1 (released 2026-09-03).
+    # Ref: https://github.com/crowdsecurity/crowdsec/releases/tag/v1.8.1
+    # (v0.0.7-style pre-releases excluded; v1.8.1 is tagged Latest.)
+    image: crowdsecurity/crowdsec:v1.8.1
+    container_name: crowdsec
+    restart: unless-stopped
+    # No host publish: LAPI (8080) + syslog (514/udp) reachable via `edge`
+    # as crowdsec:8080 / crowdsec:514. Publishing 8080 collides with
+    # netbird-dashboard 127.0.0.1:8080 on this VPS (bind failed).
+    # ports:
+    #   - "8080:8080"
+    #   - "514:514/udp"
+    volumes:
+      # Persist engine config + SQLite data across recreates (SQLite default, no external DB).
+      - crowdsec-config:/etc/crowdsec
+      - crowdsec-data:/var/lib/crowdsec/data
+      # Acquisition files (host-managed, read-only in container).
+      - ./acquis.d:/etc/crowdsec/acquis.d:ro
+      # Host auth log untuk koleksi sshd (read-only).
+      - /var/log/auth.log:/logs/auth.log:ro
+    environment:
+      # Auto-installed on first start (crowdsec docker entrypoint).
+      COLLECTIONS: "crowdsecurity/haproxy crowdsecurity/http-cve crowdsecurity/sshd"
+    networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "2"
+
+# Shared network for all edge projects (haproxy, crowdsec, netbird, ...).
+# Create once: docker network create edge
+networks:
+  edge:
+    external: true
+
+volumes:
+  crowdsec-config:
+  crowdsec-data:

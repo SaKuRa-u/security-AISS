@@ -1,0 +1,14 @@
+type: leaky
+name: custom/sso-bf
+description: "POST flood ke sso-login.php (bruteforce SSO via haproxy)"
+filter: "evt.Meta.log_type == 'http_access-log' && evt.Meta.http_path contains 'sso-login' && evt.Meta.http_verb == 'POST'"
+groupby: evt.Meta.source_ip
+capacity: 10
+leakspeed: "10s"
+blackhole: 1m
+labels:
+  service: psp-web
+  remediation: true
+  classification:
+    - attack.T1110
+  behavior: "auth:bruteforce"

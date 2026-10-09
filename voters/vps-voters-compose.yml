@@ -1,0 +1,41 @@
+# Voter VPS untuk 2 quorum (milik teman - PEMILIK VPS).
+# JANGAN di-up sekarang! Dieksekusi JOINT bareng Node 1 + Node 2:
+#  - service seaweed-master-vps -> sesi joint Fase A
+#  - service etcd-vps           -> sesi bootstrap Fase B (dengan etcd Node 1 + Node 2,
+#                                  initial-cluster HARUS identik di ketiganya saat boot pertama)
+# VPS tetap TANPA data bisnis: tanpa volume SeaweedFS, tanpa filer, tanpa Postgres.
+services:
+  # ---------- Fase A: SeaweedFS master voter (metadata saja) ----------
+  seaweed-master-vps:
+    image: chrislusf/seaweedfs:latest
+    container_name: seaweed-master-vps
+    command: "master -ip=100.101.161.30 -ip.bind=0.0.0.0 -port=9333 -mdir=/data -volumeSizeLimitMB=512 -peers=100.101.136.77:9333,100.101.133.237:9333,100.101.161.30:9333"
+    ports:
+      - "9333:9333"
+      - "19333:19333"
+    volumes:
+      - master_data_vps:/data
+    restart: unless-stopped
+
+  # ---------- Fase B: etcd voter (untuk Patroni) ----------
+  etcd-vps:
+    image: quay.io/coreos/etcd:v3.5.13
+    container_name: etcd-vps
+    command: >
+      etcd --name vps --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://100.101.161.30:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://100.101.161.30:2380
+      --initial-cluster "vps=http://100.101.161.30:2380,node1=http://100.101.136.77:2380,node2=http://100.101.133.237:2380"
+      --initial-cluster-state new
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd-vps-data:/etcd-data
+    restart: unless-stopped
+
+volumes:
+  master_data_vps:
+  etcd-vps-data:

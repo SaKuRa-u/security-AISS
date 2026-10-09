@@ -1,0 +1,86 @@
+# HAProxy contoh untuk NetBird combined container (mode Other/Manual)
+# Ref endpoint wajib: https://docs.netbird.io/selfhosted/external-reverse-proxy#combined-container-setup-v0-65-0
+# - /relay*, /ws-proxy/*            -> WebSocket ke netbird-server:80
+# - /signalexchange.SignalExchange/*, /management.ManagementService/* -> gRPC (butuh HTTP/2 / h2c)
+# - /api/*, /oauth2/*               -> HTTP ke netbird-server:80
+# - /*                              -> dashboard:80
+# UDP 3478 (STUN) TIDAK lewat HAProxy, expose langsung dari container.
+#
+# Syarat: HAProxy >= 2.5 (HTTP/2 + gRPC), sertifikat TLS valid.
+# Ganti netbirdoverlay.cloudferdi.web.id dan path sertifikat. Samakan backend dengan .env:
+#   DASHBOARD_HOST_PORT=8080, MANAGEMENT_HOST_PORT=8081
+
+global
+    log global
+    maxconn 4000
+    tune.ssl.default-dh-param 2048
+
+defaults
+    log global
+    mode http
+    option httplog
+    option dontlognull
+    timeout connect 5s
+    timeout client 1d
+    timeout server 1d
+    timeout tunnel 1d
+    timeout http-request 10s
+    timeout http-keep-alive 10s
+
+frontend fe_http
+    bind *:80
+    # Redirect HTTP -> HTTPS (biarkan /.well-known untuk validasi ACME jika pakai certbot)
+    acl is_acme path_beg /.well-known/acme-challenge/
+    http-request redirect scheme https code 301 unless is_acme
+
+frontend fe_https
+    # ALPN h2 wajib untuk gRPC
+    bind *:443 ssl crt /etc/haproxy/certs/netbird.pem alpn h2,http/1.1
+
+    # Header standar (membantu NetBird dapat IP asli, lengkapi trustedPeers di config.yaml)
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+
+    # Klasifikasi path sesuai docs resmi
+    acl is_grpc path_beg /signalexchange.SignalExchange/ /management.ManagementService/ /management.ProxyService/
+    acl is_ws path_beg /relay /ws-proxy/
+    acl is_backend_http path_beg /api/ /oauth2/
+
+    use_backend be_netbird_grpc if is_grpc
+    use_backend be_netbird_ws if is_ws
+    use_backend be_netbird_http if is_backend_http
+    default_backend be_dashboard
+
+# gRPC native: backend h2c (HTTP/2 cleartext)
+backend be_netbird_grpc
+    mode http
+    option httpchk GET /oauth2/.well-known/openid-configuration
+    http-request set-header X-Forwarded-For %[src]
+    server netbird 127.0.0.1:8081 check proto h2
+
+# WebSocket: relay + ws-proxy
+backend be_netbird_ws
+    mode http
+    option http-server-close
+    http-request set-header Upgrade %[req.hdr(Upgrade)] if { req.hdr(Upgrade) -m found }
+    http-request set-header Connection "Upgrade" if { req.hdr(Upgrade) -m found }
+    http-request set-header Host %[req.hdr(Host)]
+    http-request set-header X-Real-IP %[src]
+    http-request set-header X-Forwarded-For %[src]
+    server netbird 127.0.0.1:8081 check
+
+# REST API + OAuth2 IdP
+backend be_netbird_http
+    mode http
+    http-request set-header Host %[req.hdr(Host)]
+    http-request set-header X-Real-IP %[src]
+    http-request set-header X-Forwarded-For %[src]
+    server netbird 127.0.0.1:8081 check
+
+# Dashboard (catch-all)
+backend be_dashboard
+    mode http
+    http-request set-header Host %[req.hdr(Host)]
+    http-request set-header X-Real-IP %[src]
+    http-request set-header X-Forwarded-For %[src]
+    server dashboard 127.0.0.1:8080 check

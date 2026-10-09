@@ -1,0 +1,7 @@
+# SSHD via file tail (bukan syslog server): host /var/log/auth.log di-mount
+# read-only ke /logs/auth.log (lihat volumes di docker-compose.yml).
+# Koleksi crowdsecurity/sshd mem-parse baris "Failed password" dkk.
+filenames:
+  - /logs/auth.log
+labels:
+  type: syslog
